@@ -194,12 +194,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const data = await parseJsonSafe(res);
       if (!res.ok) {
         setLoginError(
-          typeof data.error === 'string' ? data.error : 'Incorrect password.'
+          typeof data.error === 'string'
+            ? data.error
+            : `Unable to reach authentication service (HTTP ${res.status}).`
+        );
+      } else if (!data.token || typeof data.token !== 'string') {
+        setLoginError(
+          'Authentication endpoint returned an invalid response. Ensure server/API functions are deployed.'
         );
       } else {
         setLoginPassword('');
         onLoginSuccess({
-          token: String(data.token || ''),
+          token: data.token,
           role: (data.role === 'manager' ? 'manager' : 'admin') as 'admin' | 'manager',
           name: String(data.name || 'Administrator'),
           managerEnabled: Boolean(data.managerEnabled),

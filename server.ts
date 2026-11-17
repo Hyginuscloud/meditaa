@@ -11,12 +11,18 @@ import type { SiteConfig } from './src/data/siteConfig.ts';
 dotenv.config();
 
 const PORT = Number(process.env.PORT) || 3000;
-const IS_VERCEL = Boolean(process.env.VERCEL);
+const IS_SERVERLESS = Boolean(
+  process.env.VERCEL ||
+    process.env.AWS_LAMBDA_FUNCTION_NAME ||
+    process.env.LAMBDA_TASK_ROOT ||
+    process.env.NETLIFY_FUNCTION_RUNTIME ||
+    (process.env.NETLIFY && !process.env.NETLIFY_DEV)
+);
 const ROOT_DIR = process.cwd();
-const WRITABLE_DIR = IS_VERCEL ? os.tmpdir() : ROOT_DIR;
-const DATA_DIR = path.resolve(WRITABLE_DIR, IS_VERCEL ? 'meditrust-data' : 'data');
+const WRITABLE_DIR = IS_SERVERLESS ? os.tmpdir() : ROOT_DIR;
+const DATA_DIR = path.resolve(WRITABLE_DIR, IS_SERVERLESS ? 'meditrust-data' : 'data');
 const STORE_PATH = path.resolve(DATA_DIR, 'store.json');
-const UPLOADS_DIR = path.resolve(WRITABLE_DIR, IS_VERCEL ? 'meditrust-uploads' : 'uploads');
+const UPLOADS_DIR = path.resolve(WRITABLE_DIR, IS_SERVERLESS ? 'meditrust-uploads' : 'uploads');
 
 interface SessionRecord {
   token: string;
@@ -496,7 +502,7 @@ export async function createApp(): Promise<express.Express> {
 
   // Serve uploaded images and videos
   app.use('/uploads', express.static(UPLOADS_DIR));
-  if (IS_VERCEL) {
+  if (IS_SERVERLESS) {
     const bundledUploadsDir = path.resolve(ROOT_DIR, 'uploads');
     if (fs.existsSync(bundledUploadsDir)) {
       app.use('/uploads', express.static(bundledUploadsDir));
@@ -600,7 +606,7 @@ export async function createApp(): Promise<express.Express> {
 
   // Public site configuration
   app.get('/api/site', async (_req: Request, res: Response) => {
-    if (IS_VERCEL && supabaseEnv) {
+    if (IS_SERVERLESS && supabaseEnv) {
       const remoteConfig = await loadSiteConfigFromSupabase(supabaseEnv);
       if (remoteConfig) {
         store.siteConfig = remoteConfig;
@@ -611,7 +617,7 @@ export async function createApp(): Promise<express.Express> {
 
   // Login (supports Admin or Manager password)
   app.post('/api/auth/login', async (req: Request, res: Response) => {
-    if (IS_VERCEL && supabaseEnv) {
+    if (IS_SERVERLESS && supabaseEnv) {
       await loadAuthFromSupabase(supabaseEnv, store.auth);
     }
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
@@ -665,7 +671,7 @@ export async function createApp(): Promise<express.Express> {
 
   // Verify current session
   app.get('/api/auth/me', requireAuth, async (req: AuthedRequest, res: Response) => {
-    if (IS_VERCEL && supabaseEnv) {
+    if (IS_SERVERLESS && supabaseEnv) {
       await loadAuthFromSupabase(supabaseEnv, store.auth);
     }
     res.json({
@@ -719,7 +725,7 @@ export async function createApp(): Promise<express.Express> {
       res.status(403).json({ error: 'Only Admin can change the Admin password.' });
       return;
     }
-    if (IS_VERCEL && supabaseEnv) {
+    if (IS_SERVERLESS && supabaseEnv) {
       await loadAuthFromSupabase(supabaseEnv, store.auth);
     }
     const currentPassword =
@@ -749,7 +755,7 @@ export async function createApp(): Promise<express.Express> {
       res.status(403).json({ error: 'Only Admin can assign Manager credentials.' });
       return;
     }
-    if (IS_VERCEL && supabaseEnv) {
+    if (IS_SERVERLESS && supabaseEnv) {
       await loadAuthFromSupabase(supabaseEnv, store.auth);
     }
 
@@ -820,7 +826,7 @@ async function startServer(): Promise<void> {
   });
 }
 
-if (!IS_VERCEL) {
+if (!IS_SERVERLESS) {
   startServer().catch((err) => {
     console.error('Failed to start server:', err);
     process.exit(1);
