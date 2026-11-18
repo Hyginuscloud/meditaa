@@ -22,12 +22,15 @@ import {
   X,
   Share2,
   ExternalLink,
+  Link2,
 } from 'lucide-react';
 import {
   DEFAULT_SITE_CONFIG,
   EditableProduct,
   formatSocialUrl,
+  getEmbedVideoUrl,
   MediaGalleryItem,
+  parseExternalMediaLink,
   SiteConfig,
 } from '../data/siteConfig';
 import { CATEGORIES, CategoryId } from '../data/products';
@@ -100,10 +103,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   } | null>(null);
   const [saving, setSaving] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<LightboxImage | null>(null);
+  const lastSyncedJsonRef = React.useRef<string>(JSON.stringify(config));
+  const hasUnsavedDraftRef = React.useRef<boolean>(false);
+  const autoSaveTimerRef = React.useRef<number | null>(null);
 
-  // Sync draft when config updates externally
+  // Sync draft when config updates externally and user is not mid-edit
   React.useEffect(() => {
-    setDraft(cloneConfig(config));
+    const incomingJson = JSON.stringify(config);
+    lastSyncedJsonRef.current = incomingJson;
+    if (!hasUnsavedDraftRef.current) {
+      setDraft(cloneConfig(config));
+    }
   }, [config]);
 
   React.useEffect(() => {
@@ -142,11 +152,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     imageUrl: '',
   });
 
-  // Media upload state
+  // Media upload & link state
   const [mediaTitle, setMediaTitle] = useState('');
   const [mediaCaption, setMediaCaption] = useState('');
   const [mediaPlacement, setMediaPlacement] = useState<'gallery' | 'hero'>('gallery');
   const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [mediaLinkUrl, setMediaLinkUrl] = useState('');
+  const [mediaLinkKind, setMediaLinkKind] = useState<'auto' | 'video' | 'image'>('auto');
 
   // Security & Manager state
   const [currentAdminPwd, setCurrentAdminPwd] = useState('');
@@ -243,19 +255,74 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     };
   };
 
-  const persistDraft = async (nextConfig: SiteConfig, message: string) => {
-    setSaving(true);
-    setDraft(nextConfig);
-    try {
-      const ok = await onSaveConfig(nextConfig, message);
-      if (ok) {
-        showBanner('success', message);
-      } else {
-        showBanner('error', 'Failed to save changes. Please sign in again.');
+  const persistDraft = React.useCallback(
+    async (nextConfig: SiteConfig, message: string, silent = false) => {
+      if (autoSaveTimerRef.current) {
+        window.clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
       }
-    } finally {
-      setSaving(false);
+      const nextJson = JSON.stringify(nextConfig);
+      lastSyncedJsonRef.current = nextJson;
+      hasUnsavedDraftRef.current = false;
+      setSaving(true);
+      setDraft(nextConfig);
+      try {
+        const ok = await onSaveConfig(nextConfig, message);
+        if (ok) {
+          if (!silent || message) {
+            showBanner('success', message);
+          }
+        } else {
+          showBanner('error', 'Failed to save changes. Please sign in again.');
+        }
+      } finally {
+        setSaving(false);
+      }
+    },
+    [onSaveConfig]
+  );
+
+  // Auto-save any draft edits (write-ups, prices, socials, story, FAQs) after 700ms so changes reflect immediately on the website
+  React.useEffect(() => {
+    if (!session) return;
+    const draftJson = JSON.stringify(draft);
+    if (draftJson === lastSyncedJsonRef.current) {
+      hasUnsavedDraftRef.current = false;
+      return;
     }
+    hasUnsavedDraftRef.current = true;
+    if (autoSaveTimerRef.current) {
+      window.clearTimeout(autoSaveTimerRef.current);
+    }
+    autoSaveTimerRef.current = window.setTimeout(() => {
+      autoSaveTimerRef.current = null;
+      lastSyncedJsonRef.current = draftJson;
+      hasUnsavedDraftRef.current = false;
+      void onSaveConfig(draft, 'Changes published to website').then((ok) => {
+        if (ok) {
+          showBanner('success', 'Updated & published to website');
+        } else {
+          showBanner('error', 'Could not publish changes. Please sign in again.');
+        }
+      });
+    }, 700);
+    return () => {
+      if (autoSaveTimerRef.current) {
+        window.clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+    };
+  }, [draft, onSaveConfig, session]);
+
+  const handleViewWebsite = async () => {
+    if (autoSaveTimerRef.current) {
+      window.clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    if (session && hasUnsavedDraftRef.current) {
+      await persistDraft(draft, 'Changes published to website', true);
+    }
+    onBackToSite();
   };
 
   // Product actions
@@ -437,6 +504,59 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     } finally {
       setUploadingMedia(false);
     }
+  };
+
+  const handleAddMediaFromLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsed = parseExternalMediaLink(mediaLinkUrl, mediaLinkKind);
+    if (!parsed) {
+      showBanner(
+        'error',
+        'Please paste a valid YouTube, Google Drive, or direct image/video URL.'
+      );
+      return;
+    }
+
+    const defaultTitle =
+      parsed.source === 'youtube'
+        ? 'YouTube Video'
+        : parsed.source === 'gdrive'
+        ? parsed.type === 'video'
+          ? 'Google Drive Video'
+          : 'Google Drive Photo'
+        : parsed.type === 'video'
+        ? 'Storefront Video'
+        : 'Storefront Photo';
+
+    const newItem: MediaGalleryItem = {
+      id: `media-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      type: parsed.type,
+      url: parsed.url,
+      title: mediaTitle.trim() || defaultTitle,
+      caption: mediaCaption.trim(),
+      placement: mediaPlacement,
+      createdAt: new Date().toISOString(),
+    };
+
+    let existingGallery = draft.mediaGallery;
+    if (mediaPlacement === 'hero') {
+      existingGallery = existingGallery.map((m) =>
+        m.placement === 'hero' ? { ...m, placement: 'gallery' as const } : m
+      );
+    }
+
+    const nextConfig: SiteConfig = {
+      ...draft,
+      mediaGallery: [newItem, ...existingGallery],
+    };
+
+    setMediaLinkUrl('');
+    setMediaTitle('');
+    setMediaCaption('');
+    await persistDraft(
+      nextConfig,
+      `Published ${parsed.source === 'youtube' ? 'YouTube' : parsed.source === 'gdrive' ? 'Google Drive' : 'media'} link to website`
+    );
   };
 
   const handleToggleMediaPlacement = async (id: string, placement: 'gallery' | 'hero') => {
@@ -663,7 +783,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             <button
               type="button"
-              onClick={onBackToSite}
+              onClick={() => void handleViewWebsite()}
               className="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
@@ -2116,6 +2236,79 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   onChange={(e) => void handleMediaFileUpload(e.target.files)}
                 />
               </label>
+
+              {/* Paste YouTube or Google Drive Link */}
+              <form
+                onSubmit={handleAddMediaFromLink}
+                className="border border-slate-200 bg-slate-50 rounded-2xl p-5 space-y-3"
+              >
+                <div className="flex items-start gap-2.5">
+                  <span className="w-8 h-8 rounded-lg bg-[#0A1D3D] text-amber-300 flex items-center justify-center shrink-0 mt-0.5">
+                    <Link2 className="w-4 h-4" />
+                  </span>
+                  <div>
+                    <h3 className="font-display font-bold text-sm sm:text-base text-[#0A1D3D]">
+                      Or Paste YouTube / Google Drive Link
+                    </h3>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Copy a link from YouTube (watch, Shorts, youtu.be) or Google Drive (make sure
+                      Drive sharing is set to &ldquo;Anyone with the link&rdquo;) and paste it below
+                      to display it on your website.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                  <div className="md:col-span-7">
+                    <label
+                      htmlFor="external-media-link"
+                      className="block text-xs font-semibold text-slate-700 mb-1"
+                    >
+                      YouTube or Google Drive URL *
+                    </label>
+                    <input
+                      id="external-media-link"
+                      type="text"
+                      value={mediaLinkUrl}
+                      onChange={(e) => setMediaLinkUrl(e.target.value)}
+                      placeholder="https://www.youtube.com/watch?v=... or https://drive.google.com/file/d/.../view"
+                      className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0A1D3D]/15 focus:border-[#0A1D3D]"
+                    />
+                  </div>
+
+                  <div className="md:col-span-3">
+                    <label
+                      htmlFor="external-media-kind"
+                      className="block text-xs font-semibold text-slate-700 mb-1"
+                    >
+                      Link Type
+                    </label>
+                    <select
+                      id="external-media-kind"
+                      value={mediaLinkKind}
+                      onChange={(e) =>
+                        setMediaLinkKind(e.target.value as 'auto' | 'video' | 'image')
+                      }
+                      className="w-full px-3 py-2.5 text-sm bg-white border border-slate-200 rounded-lg"
+                    >
+                      <option value="auto">Auto-detect (YouTube = Video)</option>
+                      <option value="video">Video (YouTube / Google Drive)</option>
+                      <option value="image">Photo (Google Drive / Image URL)</option>
+                    </select>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <button
+                      type="submit"
+                      disabled={saving || !mediaLinkUrl.trim()}
+                      className="w-full inline-flex items-center justify-center gap-1.5 bg-[#DC2626] hover:bg-[#B91C1C] disabled:opacity-50 text-white text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Publish Link</span>
+                    </button>
+                  </div>
+                </div>
+              </form>
             </section>
 
             {/* Gallery Heading Editor + Uploaded Items */}
@@ -2174,12 +2367,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     >
                       <div className="h-44 bg-slate-900 flex items-center justify-center overflow-hidden">
                         {item.type === 'video' ? (
-                          <video
-                            src={item.url}
-                            controls
-                            playsInline
-                            className="w-full h-full object-cover"
-                          />
+                          (() => {
+                            const embedUrl = getEmbedVideoUrl(item.url);
+                            return embedUrl ? (
+                              <iframe
+                                src={embedUrl}
+                                title={item.title || 'Embedded video'}
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                allowFullScreen
+                                className="w-full h-full border-0 bg-black"
+                              />
+                            ) : (
+                              <video
+                                src={item.url}
+                                controls
+                                playsInline
+                                className="w-full h-full object-cover"
+                              />
+                            );
+                          })()
                         ) : (
                           <button
                             type="button"

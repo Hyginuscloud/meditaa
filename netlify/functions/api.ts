@@ -1,5 +1,3 @@
-process.env.NETLIFY_FUNCTION_RUNTIME = 'true';
-
 import serverless from 'serverless-http';
 import { createApp } from '../../server.ts';
 
@@ -7,7 +5,7 @@ let cachedHandler: ReturnType<typeof serverless> | null = null;
 
 async function getHandler() {
   if (!cachedHandler) {
-    const app = await createApp();
+    const app = await createApp({ serverless: true });
     cachedHandler = serverless(app, {
       binary: ['image/*', 'video/*', 'application/octet-stream'],
     });

@@ -7,7 +7,7 @@ export const config = {
   },
 };
 
-const appPromise = createApp();
+const appPromise = createApp({ serverless: true });
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
   const app = await appPromise;

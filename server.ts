@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
@@ -188,17 +189,36 @@ interface SupabaseEnv {
   serviceKey: string;
 }
 
+function cleanEnvValue(raw: string | undefined): string {
+  if (!raw) return '';
+  return raw.trim().replace(/^(['"])(.*)\1$/, '$2').trim();
+}
+
 function getSupabaseEnv(): SupabaseEnv | null {
-  const url = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '')
-    .trim()
+  let url = cleanEnvValue(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL)
+    .replace(/\/rest\/v1\/?$/i, '')
     .replace(/\/+$/, '');
-  const serviceKey = (
+  if (url && !/^https?:\/\//i.test(url)) {
+    url = `https://${url}`;
+  }
+  const serviceKey = cleanEnvValue(
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SECRET_KEY ||
-    process.env.SUPABASE_KEY ||
-    ''
-  ).trim();
-  if (!url || !serviceKey || url.includes('YOUR_PROJECT_REF')) {
+      process.env.SUPABASE_SERVICE_KEY ||
+      process.env.SUPABASE_SECRET_KEY ||
+      process.env.SUPABASE_KEY
+  );
+  if (
+    !url ||
+    !serviceKey ||
+    url.includes('YOUR_PROJECT_REF') ||
+    serviceKey.includes('MY_SUPABASE_')
+  ) {
+    return null;
+  }
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+  } catch {
     return null;
   }
   return { url, serviceKey };
@@ -223,9 +243,23 @@ async function loadSiteConfigFromSupabase(sb: SupabaseEnv): Promise<SiteConfig |
   }
 }
 
-async function syncSiteConfigToSupabase(sb: SupabaseEnv, config: SiteConfig): Promise<void> {
+interface SyncResult {
+  ok: boolean;
+  error?: string;
+}
+
+function buildPostgrestInList(ids: string[]): string {
+  return ids
+    .map((id) => `"${id.replace(/[^a-zA-Z0-9_.-]/g, '')}"`)
+    .join(',');
+}
+
+async function syncSiteConfigToSupabase(
+  sb: SupabaseEnv,
+  config: SiteConfig
+): Promise<SyncResult> {
   try {
-    await fetch(`${sb.url}/rest/v1/site_settings?on_conflict=id`, {
+    const settingsRes = await fetch(`${sb.url}/rest/v1/site_settings?on_conflict=id`, {
       method: 'POST',
       headers: {
         apikey: sb.serviceKey,
@@ -236,6 +270,36 @@ async function syncSiteConfigToSupabase(sb: SupabaseEnv, config: SiteConfig): Pr
       body: JSON.stringify([{ id: 'main', config }]),
       signal: AbortSignal.timeout(10000),
     });
+    if (!settingsRes.ok) {
+      const detail = await settingsRes.text().catch(() => '');
+      return {
+        ok: false,
+        error: `Supabase site_settings sync failed (${settingsRes.status}): ${detail.slice(0, 140)}`,
+      };
+    }
+
+    if (config.categories.length > 0) {
+      const catRows = config.categories.map((c, idx) => ({
+        id: c.id,
+        title: c.title,
+        subtitle: c.subtitle,
+        accent_bg: c.accentBg,
+        accent_color: c.accentColor,
+        icon_type: c.iconType,
+        sort_order: idx + 1,
+      }));
+      await fetch(`${sb.url}/rest/v1/categories?on_conflict=id`, {
+        method: 'POST',
+        headers: {
+          apikey: sb.serviceKey,
+          Authorization: `Bearer ${sb.serviceKey}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates',
+        },
+        body: JSON.stringify(catRows),
+        signal: AbortSignal.timeout(10000),
+      });
+    }
 
     if (config.products.length > 0) {
       const productRows = config.products.map((p, idx) => ({
@@ -250,7 +314,7 @@ async function syncSiteConfigToSupabase(sb: SupabaseEnv, config: SiteConfig): Pr
         image_url: p.imageUrl ?? null,
         sort_order: idx + 1,
       }));
-      await fetch(`${sb.url}/rest/v1/products?on_conflict=id`, {
+      const prodRes = await fetch(`${sb.url}/rest/v1/products?on_conflict=id`, {
         method: 'POST',
         headers: {
           apikey: sb.serviceKey,
@@ -261,20 +325,26 @@ async function syncSiteConfigToSupabase(sb: SupabaseEnv, config: SiteConfig): Pr
         body: JSON.stringify(productRows),
         signal: AbortSignal.timeout(10000),
       });
-      const keepIds = config.products
-        .map((p) => `"${p.id.replace(/"/g, '')}"`)
-        .join(',');
-      await fetch(
-        `${sb.url}/rest/v1/products?id=not.in.(${encodeURIComponent(keepIds)})`,
-        {
+      if (prodRes.ok) {
+        const keepIds = buildPostgrestInList(config.products.map((p) => p.id));
+        await fetch(`${sb.url}/rest/v1/products?id=not.in.(${keepIds})`, {
           method: 'DELETE',
           headers: {
             apikey: sb.serviceKey,
             Authorization: `Bearer ${sb.serviceKey}`,
           },
           signal: AbortSignal.timeout(10000),
-        }
-      );
+        });
+      }
+    } else {
+      await fetch(`${sb.url}/rest/v1/products?id=neq.__none__`, {
+        method: 'DELETE',
+        headers: {
+          apikey: sb.serviceKey,
+          Authorization: `Bearer ${sb.serviceKey}`,
+        },
+        signal: AbortSignal.timeout(10000),
+      });
     }
 
     if (config.mediaGallery.length > 0) {
@@ -286,7 +356,7 @@ async function syncSiteConfigToSupabase(sb: SupabaseEnv, config: SiteConfig): Pr
         caption: m.caption,
         placement: m.placement,
       }));
-      await fetch(`${sb.url}/rest/v1/media_gallery?on_conflict=id`, {
+      const mediaRes = await fetch(`${sb.url}/rest/v1/media_gallery?on_conflict=id`, {
         method: 'POST',
         headers: {
           apikey: sb.serviceKey,
@@ -297,20 +367,17 @@ async function syncSiteConfigToSupabase(sb: SupabaseEnv, config: SiteConfig): Pr
         body: JSON.stringify(mediaRows),
         signal: AbortSignal.timeout(10000),
       });
-      const keepMediaIds = config.mediaGallery
-        .map((m) => `"${m.id.replace(/"/g, '')}"`)
-        .join(',');
-      await fetch(
-        `${sb.url}/rest/v1/media_gallery?id=not.in.(${encodeURIComponent(keepMediaIds)})`,
-        {
+      if (mediaRes.ok) {
+        const keepMediaIds = buildPostgrestInList(config.mediaGallery.map((m) => m.id));
+        await fetch(`${sb.url}/rest/v1/media_gallery?id=not.in.(${keepMediaIds})`, {
           method: 'DELETE',
           headers: {
             apikey: sb.serviceKey,
             Authorization: `Bearer ${sb.serviceKey}`,
           },
           signal: AbortSignal.timeout(10000),
-        }
-      );
+        });
+      }
     } else {
       await fetch(`${sb.url}/rest/v1/media_gallery?id=neq.__none__`, {
         method: 'DELETE',
@@ -321,8 +388,41 @@ async function syncSiteConfigToSupabase(sb: SupabaseEnv, config: SiteConfig): Pr
         signal: AbortSignal.timeout(10000),
       });
     }
+    return { ok: true };
   } catch (err) {
-    console.warn('Supabase sync skipped:', err instanceof Error ? err.message : err);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn('Supabase sync skipped:', msg);
+    return { ok: false, error: msg };
+  }
+}
+
+async function ensureSupabaseBucket(sb: SupabaseEnv): Promise<boolean> {
+  try {
+    const checkRes = await fetch(`${sb.url}/storage/v1/bucket/meditrust-media`, {
+      headers: {
+        apikey: sb.serviceKey,
+        Authorization: `Bearer ${sb.serviceKey}`,
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (checkRes.ok) return true;
+    const createRes = await fetch(`${sb.url}/storage/v1/bucket`, {
+      method: 'POST',
+      headers: {
+        apikey: sb.serviceKey,
+        Authorization: `Bearer ${sb.serviceKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        id: 'meditrust-media',
+        name: 'meditrust-media',
+        public: true,
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+    return createRes.ok;
+  } catch {
+    return false;
   }
 }
 
@@ -332,19 +432,29 @@ async function uploadToSupabaseStorage(
   contentType: string,
   buffer: Buffer
 ): Promise<string | null> {
-  try {
-    const encodedName = encodeURIComponent(fileName);
-    const res = await fetch(`${sb.url}/storage/v1/object/meditrust-media/${encodedName}`, {
+  const cleanMime = (contentType || 'application/octet-stream').split(';')[0].trim();
+  const encodedName = encodeURIComponent(fileName);
+  const doUpload = async () =>
+    fetch(`${sb.url}/storage/v1/object/meditrust-media/${encodedName}`, {
       method: 'POST',
       headers: {
         apikey: sb.serviceKey,
         Authorization: `Bearer ${sb.serviceKey}`,
-        'Content-Type': contentType || 'application/octet-stream',
+        'Content-Type': cleanMime || 'application/octet-stream',
         'x-upsert': 'true',
       },
       body: new Uint8Array(buffer),
       signal: AbortSignal.timeout(30000),
     });
+
+  try {
+    let res = await doUpload();
+    if (!res.ok && (res.status === 400 || res.status === 404)) {
+      const created = await ensureSupabaseBucket(sb);
+      if (created) {
+        res = await doUpload();
+      }
+    }
     if (!res.ok) return null;
     return `${sb.url}/storage/v1/object/public/meditrust-media/${encodedName}`;
   } catch {
@@ -390,9 +500,9 @@ async function loadAuthFromSupabase(sb: SupabaseEnv, auth: AuthStore): Promise<v
   }
 }
 
-async function syncAuthToSupabase(sb: SupabaseEnv, auth: AuthStore): Promise<void> {
+async function syncAuthToSupabase(sb: SupabaseEnv, auth: AuthStore): Promise<SyncResult> {
   try {
-    await fetch(`${sb.url}/rest/v1/admin_credentials?on_conflict=id`, {
+    const res = await fetch(`${sb.url}/rest/v1/admin_credentials?on_conflict=id`, {
       method: 'POST',
       headers: {
         apikey: sb.serviceKey,
@@ -411,8 +521,86 @@ async function syncAuthToSupabase(sb: SupabaseEnv, auth: AuthStore): Promise<voi
       ]),
       signal: AbortSignal.timeout(8000),
     });
-  } catch {
-    // Ignore sync errors
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      return {
+        ok: false,
+        error: `Supabase auth sync failed (${res.status}): ${detail.slice(0, 140)}`,
+      };
+    }
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : 'Supabase auth sync failed',
+    };
+  }
+}
+
+async function checkSupabaseHealth(sb: SupabaseEnv | null): Promise<{
+  supabaseConnected: boolean;
+  supabaseReachable: boolean;
+  serviceRoleVerified: boolean;
+  storageBucketReady: boolean;
+  issue: string | null;
+}> {
+  if (!sb) {
+    return {
+      supabaseConnected: false,
+      supabaseReachable: false,
+      serviceRoleVerified: false,
+      storageBucketReady: false,
+      issue: 'SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not configured.',
+    };
+  }
+  try {
+    const headers = {
+      apikey: sb.serviceKey,
+      Authorization: `Bearer ${sb.serviceKey}`,
+    };
+    const [settingsRes, credsRes, bucketRes] = await Promise.all([
+      fetch(`${sb.url}/rest/v1/site_settings?id=eq.main&select=id`, {
+        headers,
+        signal: AbortSignal.timeout(6000),
+      }),
+      fetch(`${sb.url}/rest/v1/admin_credentials?id=eq.default&select=id`, {
+        headers,
+        signal: AbortSignal.timeout(6000),
+      }),
+      fetch(`${sb.url}/storage/v1/bucket/meditrust-media`, {
+        headers,
+        signal: AbortSignal.timeout(6000),
+      }),
+    ]);
+
+    const supabaseReachable = settingsRes.ok;
+    const serviceRoleVerified = credsRes.ok;
+    const storageBucketReady = bucketRes.ok || (serviceRoleVerified && (await ensureSupabaseBucket(sb)));
+
+    let issue: string | null = null;
+    if (!supabaseReachable) {
+      issue = `Supabase REST API returned HTTP ${settingsRes.status}. Verify SUPABASE_URL and run supabase/schema.sql.`;
+    } else if (!serviceRoleVerified) {
+      issue = `Supabase rejected admin_credentials access (HTTP ${credsRes.status}). Make sure SUPABASE_SERVICE_ROLE_KEY is the service_role key (not the anon key).`;
+    } else if (!storageBucketReady) {
+      issue = 'Supabase Storage bucket "meditrust-media" could not be accessed.';
+    }
+
+    return {
+      supabaseConnected: supabaseReachable && serviceRoleVerified,
+      supabaseReachable,
+      serviceRoleVerified,
+      storageBucketReady,
+      issue,
+    };
+  } catch (err) {
+    return {
+      supabaseConnected: false,
+      supabaseReachable: false,
+      serviceRoleVerified: false,
+      storageBucketReady: false,
+      issue: err instanceof Error ? err.message : 'Unable to reach Supabase.',
+    };
   }
 }
 
@@ -478,7 +666,8 @@ function extractToken(req: Request): string | null {
   return null;
 }
 
-export async function createApp(): Promise<express.Express> {
+export async function createApp(options?: { serverless?: boolean }): Promise<express.Express> {
+  const isServerless = Boolean(options?.serverless || IS_SERVERLESS);
   const app = express();
   const store = loadStore();
   const supabaseEnv = getSupabaseEnv();
@@ -502,7 +691,7 @@ export async function createApp(): Promise<express.Express> {
 
   // Serve uploaded images and videos
   app.use('/uploads', express.static(UPLOADS_DIR));
-  if (IS_SERVERLESS) {
+  if (isServerless) {
     const bundledUploadsDir = path.resolve(ROOT_DIR, 'uploads');
     if (fs.existsSync(bundledUploadsDir)) {
       app.use('/uploads', express.static(bundledUploadsDir));
@@ -595,18 +784,23 @@ export async function createApp(): Promise<express.Express> {
     next();
   };
 
-  // Health & backend mode check
-  app.get('/api/health', (_req: Request, res: Response) => {
+  // Health & live Supabase verification
+  app.get('/api/health', async (_req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    const status = await checkSupabaseHealth(supabaseEnv);
     res.json({
       ok: true,
-      supabaseConnected: Boolean(supabaseEnv),
-      storageMode: supabaseEnv ? 'supabase' : 'local',
+      ...status,
+      storageMode: status.supabaseConnected ? 'supabase' : 'local',
     });
   });
 
-  // Public site configuration
+  // Public site configuration (always fresh, never cached)
   app.get('/api/site', async (_req: Request, res: Response) => {
-    if (IS_SERVERLESS && supabaseEnv) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    if (supabaseEnv) {
       const remoteConfig = await loadSiteConfigFromSupabase(supabaseEnv);
       if (remoteConfig) {
         store.siteConfig = remoteConfig;
@@ -617,11 +811,12 @@ export async function createApp(): Promise<express.Express> {
 
   // Login (supports Admin or Manager password)
   app.post('/api/auth/login', async (req: Request, res: Response) => {
-    if (IS_SERVERLESS && supabaseEnv) {
+    if (isServerless && supabaseEnv) {
       await loadAuthFromSupabase(supabaseEnv, store.auth);
     }
-    const password = typeof req.body?.password === 'string' ? req.body.password : '';
-    if (!password) {
+    const rawPassword = typeof req.body?.password === 'string' ? req.body.password : '';
+    const trimmedPassword = rawPassword.trim();
+    if (!rawPassword) {
       res.status(400).json({ error: 'Password is required.' });
       return;
     }
@@ -629,12 +824,16 @@ export async function createApp(): Promise<express.Express> {
     let role: 'admin' | 'manager' | null = null;
     let name = '';
 
-    if (verifyPassword(password, store.auth.adminPasswordHash)) {
+    if (
+      verifyPassword(rawPassword, store.auth.adminPasswordHash) ||
+      (trimmedPassword && verifyPassword(trimmedPassword, store.auth.adminPasswordHash))
+    ) {
       role = 'admin';
       name = 'Administrator';
     } else if (
       store.auth.managerEnabled &&
-      verifyPassword(password, store.auth.managerPasswordHash)
+      (verifyPassword(rawPassword, store.auth.managerPasswordHash) ||
+        (trimmedPassword && verifyPassword(trimmedPassword, store.auth.managerPasswordHash)))
     ) {
       role = 'manager';
       name = store.auth.managerName || 'Store Manager';
@@ -671,7 +870,7 @@ export async function createApp(): Promise<express.Express> {
 
   // Verify current session
   app.get('/api/auth/me', requireAuth, async (req: AuthedRequest, res: Response) => {
-    if (IS_SERVERLESS && supabaseEnv) {
+    if (isServerless && supabaseEnv) {
       await loadAuthFromSupabase(supabaseEnv, store.auth);
     }
     res.json({
@@ -700,7 +899,11 @@ export async function createApp(): Promise<express.Express> {
     store.siteConfig = incoming;
     saveStore(store);
     if (supabaseEnv) {
-      await syncSiteConfigToSupabase(supabaseEnv, store.siteConfig);
+      const sync = await syncSiteConfigToSupabase(supabaseEnv, store.siteConfig);
+      if (!sync.ok) {
+        res.status(502).json({ error: sync.error || 'Failed to sync changes to Supabase.' });
+        return;
+      }
     }
     res.json({ ok: true, config: store.siteConfig });
   });
@@ -714,7 +917,11 @@ export async function createApp(): Promise<express.Express> {
     store.siteConfig = structuredClone(DEFAULT_SITE_CONFIG);
     saveStore(store);
     if (supabaseEnv) {
-      await syncSiteConfigToSupabase(supabaseEnv, store.siteConfig);
+      const sync = await syncSiteConfigToSupabase(supabaseEnv, store.siteConfig);
+      if (!sync.ok) {
+        res.status(502).json({ error: sync.error || 'Failed to reset site in Supabase.' });
+        return;
+      }
     }
     res.json({ ok: true, config: store.siteConfig });
   });
@@ -725,7 +932,7 @@ export async function createApp(): Promise<express.Express> {
       res.status(403).json({ error: 'Only Admin can change the Admin password.' });
       return;
     }
-    if (IS_SERVERLESS && supabaseEnv) {
+    if (isServerless && supabaseEnv) {
       await loadAuthFromSupabase(supabaseEnv, store.auth);
     }
     const currentPassword =
@@ -744,7 +951,11 @@ export async function createApp(): Promise<express.Express> {
     store.auth.adminPasswordHash = hashPassword(newPassword);
     saveStore(store);
     if (supabaseEnv) {
-      await syncAuthToSupabase(supabaseEnv, store.auth);
+      const sync = await syncAuthToSupabase(supabaseEnv, store.auth);
+      if (!sync.ok) {
+        res.status(502).json({ error: sync.error || 'Failed to sync Admin password to Supabase.' });
+        return;
+      }
     }
     res.json({ ok: true });
   });
@@ -755,7 +966,7 @@ export async function createApp(): Promise<express.Express> {
       res.status(403).json({ error: 'Only Admin can assign Manager credentials.' });
       return;
     }
-    if (IS_SERVERLESS && supabaseEnv) {
+    if (isServerless && supabaseEnv) {
       await loadAuthFromSupabase(supabaseEnv, store.auth);
     }
 
@@ -787,7 +998,11 @@ export async function createApp(): Promise<express.Express> {
 
     saveStore(store);
     if (supabaseEnv) {
-      await syncAuthToSupabase(supabaseEnv, store.auth);
+      const sync = await syncAuthToSupabase(supabaseEnv, store.auth);
+      if (!sync.ok) {
+        res.status(502).json({ error: sync.error || 'Failed to sync Manager credentials to Supabase.' });
+        return;
+      }
     }
     res.json({
       ok: true,
@@ -826,7 +1041,11 @@ async function startServer(): Promise<void> {
   });
 }
 
-if (!IS_SERVERLESS) {
+const isMainModule =
+  Boolean(process.argv[1]) &&
+  path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
+
+if (!IS_SERVERLESS && isMainModule) {
   startServer().catch((err) => {
     console.error('Failed to start server:', err);
     process.exit(1);

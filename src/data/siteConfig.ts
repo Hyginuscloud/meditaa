@@ -1,16 +1,15 @@
 import {
   CATEGORIES,
-  CategoryInfo,
   COMMITMENTS,
   FAQS,
   PRODUCTS,
-  Product,
   SERVICES,
   STORE_ADDRESS,
   STORE_HOURS_TOP,
   WHATSAPP_DISPLAY,
   WHATSAPP_NUMBER,
 } from './products.ts';
+import type { CategoryInfo, Product } from './products.ts';
 
 export interface EditableProduct extends Product {
   imageUrl?: string;
@@ -302,4 +301,136 @@ export function formatSocialUrl(
   if (platform === 'instagram') return `https://www.instagram.com/${cleanHandle}`;
   return `https://www.facebook.com/${cleanHandle}`;
 }
+
+export function extractYouTubeVideoId(rawUrl: string): string | null {
+  const input = (rawUrl || '').trim();
+  if (!input) return null;
+  try {
+    const normalized = /^https?:\/\//i.test(input) ? input : `https://${input}`;
+    const u = new URL(normalized);
+    const host = u.hostname.replace(/^www\./i, '').toLowerCase();
+    if (host === 'youtu.be') {
+      const id = u.pathname.replace(/^\/+/, '').split('/')[0];
+      return id || null;
+    }
+    if (
+      host === 'youtube.com' ||
+      host === 'm.youtube.com' ||
+      host === 'youtube-nocookie.com'
+    ) {
+      if (u.pathname === '/watch') {
+        return u.searchParams.get('v') || null;
+      }
+      const parts = u.pathname.split('/').filter(Boolean);
+      if (
+        parts.length >= 2 &&
+        (parts[0] === 'embed' || parts[0] === 'shorts' || parts[0] === 'live' || parts[0] === 'v')
+      ) {
+        return parts[1] || null;
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+export function extractGoogleDriveFileId(rawUrl: string): string | null {
+  const input = (rawUrl || '').trim();
+  if (!input) return null;
+  try {
+    const normalized = /^https?:\/\//i.test(input) ? input : `https://${input}`;
+    const u = new URL(normalized);
+    const host = u.hostname.replace(/^www\./i, '').toLowerCase();
+    if (host === 'drive.google.com' || host === 'docs.google.com') {
+      const fileMatch = u.pathname.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (fileMatch?.[1]) return fileMatch[1];
+      const dMatch = u.pathname.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      if (dMatch?.[1]) return dMatch[1];
+      const idParam = u.searchParams.get('id');
+      if (idParam) return idParam;
+    }
+    if (host === 'lh3.googleusercontent.com') {
+      const dMatch = u.pathname.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      if (dMatch?.[1]) return dMatch[1];
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+export function parseExternalMediaLink(
+  rawUrl: string,
+  preferredKind: 'auto' | 'image' | 'video' = 'auto'
+): { url: string; type: 'image' | 'video'; source: 'youtube' | 'gdrive' | 'direct' } | null {
+  const trimmed = (rawUrl || '').trim();
+  if (!trimmed) return null;
+
+  const ytId = extractYouTubeVideoId(trimmed);
+  if (ytId) {
+    return {
+      url: `https://www.youtube.com/embed/${ytId}?rel=0`,
+      type: 'video',
+      source: 'youtube',
+    };
+  }
+
+  const normalized = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  const driveId = extractGoogleDriveFileId(normalized);
+  if (driveId) {
+    if (preferredKind === 'image') {
+      return {
+        url: `https://drive.google.com/thumbnail?id=${driveId}&sz=w1600`,
+        type: 'image',
+        source: 'gdrive',
+      };
+    }
+    return {
+      url: `https://drive.google.com/file/d/${driveId}/preview`,
+      type: 'video',
+      source: 'gdrive',
+    };
+  }
+
+  try {
+    const u = new URL(normalized);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    const lowerPath = u.pathname.toLowerCase();
+    const isVideoExt = /\.(mp4|webm|mov|m4v|ogg|ogv)$/i.test(lowerPath);
+    const isImageExt = /\.(png|jpe?g|webp|gif|svg|avif|bmp)$/i.test(lowerPath);
+    const type: 'image' | 'video' =
+      preferredKind === 'image'
+        ? 'image'
+        : preferredKind === 'video'
+        ? 'video'
+        : isVideoExt
+        ? 'video'
+        : isImageExt
+        ? 'image'
+        : 'image';
+    return {
+      url: u.toString(),
+      type,
+      source: 'direct',
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function getEmbedVideoUrl(rawUrl: string): string | null {
+  const trimmed = (rawUrl || '').trim();
+  if (!trimmed) return null;
+  const ytId = extractYouTubeVideoId(trimmed);
+  if (ytId) {
+    return `https://www.youtube.com/embed/${ytId}?rel=0`;
+  }
+  const driveId = extractGoogleDriveFileId(trimmed);
+  if (driveId) {
+    return `https://drive.google.com/file/d/${driveId}/preview`;
+  }
+  return null;
+}
+
 

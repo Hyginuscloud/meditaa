@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowUpRight, ShoppingCart, Check, Heart, ShoppingBag } from 'lucide-react';
-import { SiteConfig } from '../data/siteConfig';
+import { getEmbedVideoUrl, SiteConfig } from '../data/siteConfig';
 
 interface HeroProps {
   onOpenCart: () => void;
@@ -77,12 +77,25 @@ export const Hero: React.FC<HeroProps> = ({ onOpenCart, config, onImageClick }) 
             {heroMedia ? (
               <div className="relative w-full max-w-md rounded-2xl overflow-hidden border border-white/15 shadow-2xl bg-[#071630]">
                 {heroMedia.type === 'video' ? (
-                  <video
-                    src={heroMedia.url}
-                    controls
-                    playsInline
-                    className="w-full h-64 sm:h-80 object-cover"
-                  />
+                  (() => {
+                    const embedUrl = getEmbedVideoUrl(heroMedia.url);
+                    return embedUrl ? (
+                      <iframe
+                        src={embedUrl}
+                        title={heroMedia.title || hero.headline}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                        className="w-full h-64 sm:h-80 border-0 bg-black"
+                      />
+                    ) : (
+                      <video
+                        src={heroMedia.url}
+                        controls
+                        playsInline
+                        className="w-full h-64 sm:h-80 object-cover"
+                      />
+                    );
+                  })()
                 ) : (
                   <button
                     type="button"

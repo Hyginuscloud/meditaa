@@ -29,7 +29,13 @@ import { CartDrawer, CartItem, formatNaira } from './components/CartDrawer';
 import { AdminDashboard, AuthSessionInfo } from './components/AdminDashboard';
 import { ImageLightbox, LightboxImage } from './components/ImageLightbox';
 import { CategoryId, CATEGORIES } from './data/products';
-import { DEFAULT_SITE_CONFIG, EditableProduct, formatSocialUrl, SiteConfig } from './data/siteConfig';
+import {
+  DEFAULT_SITE_CONFIG,
+  EditableProduct,
+  formatSocialUrl,
+  getEmbedVideoUrl,
+  SiteConfig,
+} from './data/siteConfig';
 
 const TOKEN_STORAGE_KEY = 'meditrust_admin_token';
 
@@ -138,10 +144,40 @@ export default function App() {
     };
   }, []);
 
+  const fetchLatestSiteConfig = React.useCallback(async () => {
+    try {
+      const res = await fetch(`/api/site?_=${Date.now()}`, { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data?.config) {
+        setSiteConfig(data.config as SiteConfig);
+      }
+    } catch {
+      // Keep current config if offline
+    }
+  }, []);
+
+  const broadcastSiteSync = React.useCallback((nextConfig: SiteConfig) => {
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const ch = new BroadcastChannel('meditrust_site_sync');
+        ch.postMessage({ type: 'site-updated', config: nextConfig });
+        ch.close();
+      }
+    } catch {
+      // Ignore BroadcastChannel restriction
+    }
+    try {
+      window.localStorage.setItem('meditrust_site_sync_ts', String(Date.now()));
+    } catch {
+      // Ignore storage restriction
+    }
+  }, []);
+
   // Load persisted site configuration and verify saved session
   useEffect(() => {
     let active = true;
-    fetch('/api/site')
+    fetch(`/api/site?_=${Date.now()}`, { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (active && data?.config) {
@@ -156,6 +192,7 @@ export default function App() {
     if (savedToken) {
       fetch('/api/auth/me', {
         headers: { Authorization: `Bearer ${savedToken}` },
+        cache: 'no-store',
       })
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
@@ -180,6 +217,60 @@ export default function App() {
       active = false;
     };
   }, []);
+
+  // Live-sync storefront across tabs, on window focus, and periodically while viewing storefront
+  useEffect(() => {
+    let channel: BroadcastChannel | null = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        channel = new BroadcastChannel('meditrust_site_sync');
+        channel.onmessage = (event) => {
+          if (event?.data?.type === 'site-updated' && event.data.config) {
+            setSiteConfig(event.data.config as SiteConfig);
+          }
+        };
+      }
+    } catch {
+      // Ignore BroadcastChannel unavailability
+    }
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'meditrust_site_sync_ts') {
+        void fetchLatestSiteConfig();
+      }
+    };
+
+    const handleFocusOrVisible = () => {
+      if (!isAdminRoute && document.visibilityState !== 'hidden') {
+        void fetchLatestSiteConfig();
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('focus', handleFocusOrVisible);
+    document.addEventListener('visibilitychange', handleFocusOrVisible);
+
+    const intervalId = window.setInterval(() => {
+      if (!isAdminRoute && document.visibilityState === 'visible') {
+        void fetchLatestSiteConfig();
+      }
+    }, 15000);
+
+    return () => {
+      if (channel) channel.close();
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('focus', handleFocusOrVisible);
+      document.removeEventListener('visibilitychange', handleFocusOrVisible);
+      window.clearInterval(intervalId);
+    };
+  }, [fetchLatestSiteConfig, isAdminRoute]);
+
+  // Refresh storefront immediately when leaving Admin route
+  useEffect(() => {
+    if (!isAdminRoute) {
+      void fetchLatestSiteConfig();
+    }
+  }, [fetchLatestSiteConfig, isAdminRoute]);
 
   const handleAdminLoginSuccess = (session: AuthSessionInfo) => {
     setSessionExpiredNotice('');
@@ -221,7 +312,9 @@ export default function App() {
       }
       if (!res.ok) return false;
       const data = await res.json();
-      setSiteConfig(data.config as SiteConfig);
+      const saved = (data.config as SiteConfig) || nextConfig;
+      setSiteConfig(saved);
+      broadcastSiteSync(saved);
       return true;
     } catch {
       return false;
@@ -243,7 +336,9 @@ export default function App() {
       }
       if (!res.ok) return false;
       const data = await res.json();
-      setSiteConfig(data.config as SiteConfig);
+      const resetCfg = data.config as SiteConfig;
+      setSiteConfig(resetCfg);
+      broadcastSiteSync(resetCfg);
       return true;
     } catch {
       return false;
@@ -257,6 +352,7 @@ export default function App() {
       window.location.hash = '#home';
     }
     setIsAdminRoute(false);
+    void fetchLatestSiteConfig();
     window.scrollTo({ top: 0, behavior: 'auto' });
   };
 
@@ -650,12 +746,25 @@ export default function App() {
                   >
                     <div className="h-60 bg-slate-900 overflow-hidden">
                       {item.type === 'video' ? (
-                        <video
-                          src={item.url}
-                          controls
-                          playsInline
-                          className="w-full h-full object-cover"
-                        />
+                        (() => {
+                          const embedUrl = getEmbedVideoUrl(item.url);
+                          return embedUrl ? (
+                            <iframe
+                              src={embedUrl}
+                              title={item.title || 'Storefront video'}
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                              allowFullScreen
+                              className="w-full h-full border-0 bg-black"
+                            />
+                          ) : (
+                            <video
+                              src={item.url}
+                              controls
+                              playsInline
+                              className="w-full h-full object-cover"
+                            />
+                          );
+                        })()
                       ) : (
                         <button
                           type="button"
