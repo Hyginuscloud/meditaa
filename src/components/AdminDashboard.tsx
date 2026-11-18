@@ -246,8 +246,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       onLogout();
       throw new Error('Your session expired. Please sign in again.');
     }
+    if (res.status === 413) {
+      throw new Error(
+        'File exceeds the ~4.5 MB serverless upload limit. Compress the file or paste a YouTube / Google Drive link instead.'
+      );
+    }
     if (!res.ok) {
-      throw new Error(typeof data.error === 'string' ? data.error : 'Upload failed');
+      throw new Error(
+        typeof data.error === 'string' ? data.error : `Upload failed (HTTP ${res.status})`
+      );
     }
     return {
       url: String(data.url || ''),

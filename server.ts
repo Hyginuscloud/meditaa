@@ -606,12 +606,20 @@ async function checkSupabaseHealth(sb: SupabaseEnv | null): Promise<{
 
 function loadStore(): PersistedStore {
   ensureDirectories();
-  const bundledStorePath = path.resolve(ROOT_DIR, 'data', 'store.json');
-  const readPath = fs.existsSync(STORE_PATH)
-    ? STORE_PATH
-    : fs.existsSync(bundledStorePath)
-    ? bundledStorePath
-    : null;
+  const currentUrl = typeof import.meta !== 'undefined' ? import.meta.url : undefined;
+  const currentDir = currentUrl ? path.dirname(fileURLToPath(currentUrl)) : null;
+  const candidateStorePaths = [
+    STORE_PATH,
+    path.resolve(ROOT_DIR, 'data', 'store.json'),
+    ...(currentDir
+      ? [
+          path.resolve(currentDir, 'data', 'store.json'),
+          path.resolve(currentDir, '../data/store.json'),
+          path.resolve(currentDir, '../../data/store.json'),
+        ]
+      : []),
+  ];
+  const readPath = candidateStorePaths.find((p) => fs.existsSync(p)) ?? null;
 
   if (!readPath) {
     const initial = createInitialStore();
@@ -1010,6 +1018,23 @@ export async function createApp(options?: { serverless?: boolean }): Promise<exp
       managerName: store.auth.managerName,
       hasPassword: Boolean(store.auth.managerPasswordHash),
     });
+  });
+
+  app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) {
+      next(err);
+      return;
+    }
+    const status =
+      typeof (err as { status?: number })?.status === 'number'
+        ? (err as { status: number }).status
+        : 500;
+    const message = err instanceof Error ? err.message : 'Unexpected server error.';
+    if (req.path.startsWith('/api')) {
+      res.status(status).json({ error: message });
+      return;
+    }
+    res.status(status).send(message);
   });
 
   return app;
