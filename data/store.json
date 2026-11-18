@@ -44,50 +44,50 @@
       {
         "id": "Pharmacy",
         "title": "Pharmacy",
-        "subtitle": "Medicines & health essentials",
         "accentBg": "bg-rose-50",
-        "accentColor": "text-rose-600",
-        "iconType": "pill"
+        "iconType": "pill",
+        "subtitle": "Medicines & health essentials",
+        "accentColor": "text-rose-600"
       },
       {
         "id": "Personal Care",
         "title": "Personal Care",
-        "subtitle": "Skin, hair & body care",
         "accentBg": "bg-sky-50",
-        "accentColor": "text-sky-600",
-        "iconType": "lotion"
+        "iconType": "lotion",
+        "subtitle": "Skin, hair & body care",
+        "accentColor": "text-sky-600"
       },
       {
         "id": "Baby Care",
         "title": "Baby Care",
-        "subtitle": "Baby hygiene & comfort",
         "accentBg": "bg-amber-50",
-        "accentColor": "text-amber-600",
-        "iconType": "baby"
+        "iconType": "baby",
+        "subtitle": "Baby hygiene & comfort",
+        "accentColor": "text-amber-600"
       },
       {
         "id": "Provisions",
         "title": "Provisions",
-        "subtitle": "Snacks, honey & groceries",
         "accentBg": "bg-orange-50",
-        "accentColor": "text-orange-600",
-        "iconType": "bread"
+        "iconType": "bread",
+        "subtitle": "Snacks, honey & groceries",
+        "accentColor": "text-orange-600"
       },
       {
         "id": "Household",
         "title": "Household",
-        "subtitle": "Home cleaning essentials",
         "accentBg": "bg-emerald-50",
-        "accentColor": "text-emerald-600",
-        "iconType": "spray"
+        "iconType": "spray",
+        "subtitle": "Home cleaning essentials",
+        "accentColor": "text-emerald-600"
       },
       {
         "id": "Contraceptives",
         "title": "Contraceptives",
-        "subtitle": "Family planning essentials",
         "accentBg": "bg-indigo-50",
-        "accentColor": "text-indigo-600",
-        "iconType": "shield"
+        "iconType": "shield",
+        "subtitle": "Family planning essentials",
+        "accentColor": "text-indigo-600"
       }
     ],
     "productsSection": {
@@ -100,282 +100,282 @@
       {
         "id": "paracetamol-tablets",
         "name": "Paracetamol Tablets",
-        "category": "Pharmacy",
-        "description": "Common pain and fever relief. Use as directed.",
-        "price": 500,
         "unit": "Pack",
+        "price": 500,
+        "iconKey": "tablets",
+        "category": "Pharmacy",
         "badgeColor": "#DBEAFE",
-        "iconKey": "tablets"
+        "description": "Common pain and fever relief. Use as directed."
       },
       {
         "id": "vitamin-c",
         "name": "Vitamin C",
-        "category": "Pharmacy",
-        "description": "Vitamin supplement. Check suitability with a professional.",
-        "price": 1800,
         "unit": "Pack",
+        "price": 1800,
+        "iconKey": "citrus",
+        "category": "Pharmacy",
         "badgeColor": "#FFEDD5",
-        "iconKey": "citrus"
+        "description": "Vitamin supplement. Check suitability with a professional."
       },
       {
         "id": "oral-rehydration-salts",
         "name": "Oral Rehydration Salts",
-        "category": "Pharmacy",
-        "description": "Rehydration salts for preparation as directed.",
-        "price": 350,
         "unit": "Sachet",
+        "price": 350,
+        "iconKey": "droplet",
+        "category": "Pharmacy",
         "badgeColor": "#E0F2FE",
-        "iconKey": "droplet"
+        "description": "Rehydration salts for preparation as directed."
       },
       {
         "id": "antiseptic-solution",
         "name": "Antiseptic Solution",
-        "category": "Pharmacy",
-        "description": "For appropriate external use as labelled.",
-        "price": 1500,
         "unit": "Bottle",
+        "price": 1500,
+        "iconKey": "antiseptic",
+        "category": "Pharmacy",
         "badgeColor": "#FEF3C7",
-        "iconKey": "antiseptic"
+        "description": "For appropriate external use as labelled."
       },
       {
         "id": "first-aid-plasters",
         "name": "First Aid Plasters",
-        "category": "Pharmacy",
-        "description": "Basic first aid dressing essentials.",
-        "price": 800,
         "unit": "Pack",
+        "price": 800,
+        "iconKey": "plaster",
+        "category": "Pharmacy",
         "badgeColor": "#FFE4E6",
-        "iconKey": "plaster"
+        "description": "Basic first aid dressing essentials."
       },
       {
         "id": "digital-thermometer",
         "name": "Digital Thermometer",
-        "category": "Pharmacy",
-        "description": "For checking body temperature; follow instructions.",
-        "price": 4500,
         "unit": "Piece",
+        "price": 4500,
+        "iconKey": "thermometer",
+        "category": "Pharmacy",
         "badgeColor": "#F1F5F9",
-        "iconKey": "thermometer"
+        "description": "For checking body temperature; follow instructions."
       },
       {
         "id": "body-lotion",
         "name": "Body Lotion",
-        "category": "Personal Care",
-        "description": "Daily moisturising body care.",
-        "price": 2500,
         "unit": "Bottle",
+        "price": 2500,
+        "iconKey": "lotion",
+        "category": "Personal Care",
         "badgeColor": "#FEF9C3",
-        "iconKey": "lotion"
+        "description": "Daily moisturising body care."
       },
       {
         "id": "hair-cream",
         "name": "Hair Cream",
-        "category": "Personal Care",
-        "description": "Hair grooming and conditioning essential.",
-        "price": 1800,
         "unit": "Jar",
+        "price": 1800,
+        "iconKey": "haircream",
+        "category": "Personal Care",
         "badgeColor": "#E0F2FE",
-        "iconKey": "haircream"
+        "description": "Hair grooming and conditioning essential."
       },
       {
         "id": "petroleum-jelly",
         "name": "Petroleum Jelly",
-        "category": "Personal Care",
-        "description": "A versatile skin moisturising product.",
-        "price": 1200,
         "unit": "Jar",
+        "price": 1200,
+        "iconKey": "jelly",
+        "category": "Personal Care",
         "badgeColor": "#ECFCCB",
-        "iconKey": "jelly"
+        "description": "A versatile skin moisturising product."
       },
       {
         "id": "bathing-soap",
         "name": "Bathing Soap",
-        "category": "Personal Care",
-        "description": "For everyday bathing and cleansing.",
-        "price": 700,
         "unit": "Bar",
+        "price": 700,
+        "iconKey": "soap",
+        "category": "Personal Care",
         "badgeColor": "#CCFBF1",
-        "iconKey": "soap"
+        "description": "For everyday bathing and cleansing."
       },
       {
         "id": "toothpaste",
         "name": "Toothpaste",
-        "category": "Personal Care",
-        "description": "Daily oral hygiene essential.",
-        "price": 1500,
         "unit": "Tube",
+        "price": 1500,
+        "iconKey": "toothpaste",
+        "category": "Personal Care",
         "badgeColor": "#F1F5F9",
-        "iconKey": "toothpaste"
+        "description": "Daily oral hygiene essential."
       },
       {
         "id": "shampoo",
         "name": "Shampoo",
-        "category": "Personal Care",
-        "description": "Hair cleansing and care.",
-        "price": 2200,
         "unit": "Bottle",
+        "price": 2200,
+        "iconKey": "shampoo",
+        "category": "Personal Care",
         "badgeColor": "#EDE9FE",
-        "iconKey": "shampoo"
+        "description": "Hair cleansing and care."
       },
       {
         "id": "baby-diapers",
         "name": "Baby Diapers",
-        "category": "Baby Care",
-        "description": "Baby diaper pack. Confirm size and quantity.",
-        "price": 6500,
         "unit": "Pack",
+        "price": 6500,
+        "iconKey": "diapers",
+        "category": "Baby Care",
         "badgeColor": "#FEF3C7",
-        "iconKey": "diapers"
+        "description": "Baby diaper pack. Confirm size and quantity."
       },
       {
         "id": "baby-wipes",
         "name": "Baby Wipes",
-        "category": "Baby Care",
-        "description": "Convenient baby cleaning wipes.",
-        "price": 1800,
         "unit": "Pack",
+        "price": 1800,
+        "iconKey": "wipes",
+        "category": "Baby Care",
         "badgeColor": "#E0F2FE",
-        "iconKey": "wipes"
+        "description": "Convenient baby cleaning wipes."
       },
       {
         "id": "baby-lotion",
         "name": "Baby Lotion",
-        "category": "Baby Care",
-        "description": "Gentle baby skin care; check the label.",
-        "price": 2400,
         "unit": "Bottle",
+        "price": 2400,
+        "iconKey": "babylotion",
+        "category": "Baby Care",
         "badgeColor": "#FCE7F3",
-        "iconKey": "babylotion"
+        "description": "Gentle baby skin care; check the label."
       },
       {
         "id": "baby-powder",
         "name": "Baby Powder",
-        "category": "Baby Care",
-        "description": "Baby care product. Keep powder away from the baby's face.",
-        "price": 1700,
         "unit": "Bottle",
+        "price": 1700,
+        "iconKey": "powder",
+        "category": "Baby Care",
         "badgeColor": "#F3E8FF",
-        "iconKey": "powder"
+        "description": "Baby care product. Keep powder away from the baby's face."
       },
       {
         "id": "sliced-bread",
         "name": "Sliced Bread",
-        "category": "Provisions",
-        "description": "Everyday bread. Confirm current availability.",
-        "price": 1800,
         "unit": "Loaf",
+        "price": 1800,
+        "iconKey": "bread",
+        "category": "Provisions",
         "badgeColor": "#FEF3C7",
-        "iconKey": "bread"
+        "description": "Everyday bread. Confirm current availability."
       },
       {
         "id": "pure-honey",
         "name": "Pure Honey",
-        "category": "Provisions",
-        "description": "Honey for household use.",
-        "price": 3500,
         "unit": "Bottle",
+        "price": 3500,
+        "iconKey": "honey",
+        "category": "Provisions",
         "badgeColor": "#FFEDD5",
-        "iconKey": "honey"
+        "description": "Honey for household use."
       },
       {
         "id": "biscuits",
         "name": "Biscuits",
-        "category": "Provisions",
-        "description": "A convenient snack for home or work.",
-        "price": 500,
         "unit": "Pack",
+        "price": 500,
+        "iconKey": "biscuits",
+        "category": "Provisions",
         "badgeColor": "#FEF3C7",
-        "iconKey": "biscuits"
+        "description": "A convenient snack for home or work."
       },
       {
         "id": "breakfast-cereal",
         "name": "Breakfast Cereal",
-        "category": "Provisions",
-        "description": "A convenient breakfast cupboard staple.",
-        "price": 3200,
         "unit": "Pack",
+        "price": 3200,
+        "iconKey": "cereal",
+        "category": "Provisions",
         "badgeColor": "#FFE4E6",
-        "iconKey": "cereal"
+        "description": "A convenient breakfast cupboard staple."
       },
       {
         "id": "instant-noodles",
         "name": "Instant Noodles",
-        "category": "Provisions",
-        "description": "Quick-cooking pantry staple.",
-        "price": 600,
         "unit": "Pack",
+        "price": 600,
+        "iconKey": "noodles",
+        "category": "Provisions",
         "badgeColor": "#FEF9C3",
-        "iconKey": "noodles"
+        "description": "Quick-cooking pantry staple."
       },
       {
         "id": "sugar",
         "name": "Sugar",
-        "category": "Provisions",
-        "description": "Everyday kitchen ingredient.",
-        "price": 1500,
         "unit": "Pack",
+        "price": 1500,
+        "iconKey": "sugar",
+        "category": "Provisions",
         "badgeColor": "#F1F5F9",
-        "iconKey": "sugar"
+        "description": "Everyday kitchen ingredient."
       },
       {
         "id": "dishwashing-liquid",
         "name": "Dishwashing Liquid",
-        "category": "Household",
-        "description": "For routine dishwashing as directed.",
-        "price": 1800,
         "unit": "Bottle",
+        "price": 1800,
+        "iconKey": "dishwash",
+        "category": "Household",
         "badgeColor": "#DCFCE7",
-        "iconKey": "dishwash"
+        "description": "For routine dishwashing as directed."
       },
       {
         "id": "laundry-detergent",
         "name": "Laundry Detergent",
-        "category": "Household",
-        "description": "Laundry cleaning essential.",
-        "price": 2800,
         "unit": "Pack",
+        "price": 2800,
+        "iconKey": "detergent",
+        "category": "Household",
         "badgeColor": "#DBEAFE",
-        "iconKey": "detergent"
+        "description": "Laundry cleaning essential."
       },
       {
         "id": "toilet-tissue",
         "name": "Toilet Tissue",
-        "category": "Household",
-        "description": "Everyday bathroom essential.",
-        "price": 1500,
         "unit": "Pack",
+        "price": 1500,
+        "iconKey": "tissue",
+        "category": "Household",
         "badgeColor": "#F1F5F9",
-        "iconKey": "tissue"
+        "description": "Everyday bathroom essential."
       },
       {
         "id": "household-bleach",
         "name": "Household Bleach",
-        "category": "Household",
-        "description": "Use as directed. Never mix bleach with other cleaners.",
-        "price": 1300,
         "unit": "Bottle",
+        "price": 1300,
+        "iconKey": "bleach",
+        "category": "Household",
         "badgeColor": "#E0F2FE",
-        "iconKey": "bleach"
+        "description": "Use as directed. Never mix bleach with other cleaners."
       },
       {
         "id": "condoms",
         "name": "Condoms",
-        "category": "Contraceptives",
-        "description": "Check the expiry date and package integrity.",
-        "price": 1200,
         "unit": "Pack",
+        "price": 1200,
+        "iconKey": "condoms",
+        "category": "Contraceptives",
         "badgeColor": "#FFE4E6",
-        "iconKey": "condoms"
+        "description": "Check the expiry date and package integrity."
       },
       {
         "id": "lubricant",
         "name": "Lubricant",
-        "category": "Contraceptives",
-        "description": "Check compatibility with the condom material.",
-        "price": 2500,
         "unit": "Pack",
+        "price": 2500,
+        "iconKey": "lubricant",
+        "category": "Contraceptives",
         "badgeColor": "#E0F2FE",
-        "iconKey": "lubricant"
+        "description": "Check compatibility with the condom material."
       }
     ],
     "servicesSection": {
@@ -409,8 +409,8 @@
       "eyebrow": "OUR STORY",
       "heading": "Built for Orji Town, Owerri — putting care first every day.",
       "body": "MediTrust Pharmacy & Varieties brings together reliable pharmacy essentials and daily household varieties in one accessible neighbourhood store. Whether you are stopping by for first-aid items, baby care, or pantry staples, our counter team focuses on clear communication, honest pricing, and attentive service.",
-      "ceoImageUrl": "/src/assets/images/meditrust_ceo_demo_1794918002197.jpg",
-      "ceoName": "Chief Executive Officer",
+      "ceoImageUrl": "https://mdgnmqjifmrsreeojpwn.supabase.co/storage/v1/object/public/meditrust-media/1794994292263-qqqqqq.jpeg",
+      "ceoName": "Mrs. Tina Chief Executive Officer",
       "ceoTitle": "Founder & Managing Director · MediTrust Pharmacy & Varieties",
       "pillars": [
         {
@@ -438,20 +438,20 @@
         {
           "id": "commitment-1",
           "label": "Friendly Service",
-          "headline": "Respectful, clear assistance",
-          "detail": "Every enquiry receives calm, attentive support so you can confirm stock, pack sizes, and usage directions before purchasing."
+          "detail": "Every enquiry receives calm, attentive support so you can confirm stock, pack sizes, and usage directions before purchasing.",
+          "headline": "Respectful, clear assistance"
         },
         {
           "id": "commitment-2",
           "label": "Convenient Ordering",
-          "headline": "Quick WhatsApp shopping list",
-          "detail": "Select your daily essentials across all six categories and share an itemised list with our counter team in seconds."
+          "detail": "Select your daily essentials across all six categories and share an itemised list with our counter team in seconds.",
+          "headline": "Quick WhatsApp shopping list"
         },
         {
           "id": "commitment-3",
           "label": "Delivery Enquiries",
-          "headline": "Flexible local coordination",
-          "detail": "Coordinate store pickup in Orji Town or ask our team about local delivery availability and dispatch arrangements around Owerri."
+          "detail": "Coordinate store pickup in Orji Town or ask our team about local delivery availability and dispatch arrangements around Owerri.",
+          "headline": "Flexible local coordination"
         }
       ]
     },
@@ -460,29 +460,29 @@
       "heading": "Quick answers before you order.",
       "items": [
         {
-          "id": "faq-1",
+          "a": "Add the items you need to your cart or click Buy Now on any product, then open your cart and click Send Order via WhatsApp. Our team will confirm availability, final prices, and pickup or delivery options.",
           "q": "How do I place an order on this website?",
-          "a": "Add the items you need to your cart or click Buy Now on any product, then open your cart and click Send Order via WhatsApp. Our team will confirm availability, final prices, and pickup or delivery options."
+          "id": "faq-1"
         },
         {
-          "id": "faq-2",
+          "a": "Prices are displayed in Nigerian naira (₦) as a helpful guide. Please confirm current stock, pack size, and final total with our team on WhatsApp before making any payment.",
           "q": "Are the prices shown final?",
-          "a": "Prices are displayed in Nigerian naira (₦) as a helpful guide. Please confirm current stock, pack size, and final total with our team on WhatsApp before making any payment."
+          "id": "faq-2"
         },
         {
-          "id": "faq-3",
+          "a": "Yes, you can make delivery enquiries when sending your cart via WhatsApp or by messaging +234 810 005 1616. Store pickup is also available at Orji Town, Owerri.",
           "q": "Do you offer delivery around Owerri?",
-          "a": "Yes, you can make delivery enquiries when sending your cart via WhatsApp or by messaging +234 810 005 1616. Store pickup is also available at Orji Town, Owerri."
+          "id": "faq-3"
         },
         {
-          "id": "faq-4",
+          "a": "We are open Monday to Saturday from 8 AM to 10 PM, and on Sunday from 12 AM to 11 PM.",
           "q": "What are your opening hours?",
-          "a": "We are open Monday to Saturday from 8 AM to 10 PM, and on Sunday from 12 AM to 11 PM."
+          "id": "faq-4"
         },
         {
-          "id": "faq-5",
+          "a": "Product listings on this site are for shopping enquiry and are not medical advice. Always read product labels and consult an appropriately qualified healthcare professional before using medicines.",
           "q": "Can I ask questions about medicine usage?",
-          "a": "Product listings on this site are for shopping enquiry and are not medical advice. Always read product labels and consult an appropriately qualified healthcare professional before using medicines."
+          "id": "faq-5"
         }
       ]
     },
@@ -572,6 +572,12 @@
         "role": "admin",
         "name": "Administrator",
         "expiresAt": 1795598480873
+      },
+      {
+        "token": "eyJyb2xlIjoiYWRtaW4iLCJuYW1lIjoiQWRtaW5pc3RyYXRvciIsImV4cCI6MTc5NTYwMDczNjI3OH0.MvrbJtYAU8Ivb47GwLZq07IJPSKuaVO-hvP_hOxBdGo",
+        "role": "admin",
+        "name": "Administrator",
+        "expiresAt": 1795600736278
       }
     ]
   }

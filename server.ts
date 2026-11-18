@@ -1041,9 +1041,12 @@ async function startServer(): Promise<void> {
   });
 }
 
+const currentFileUrl = typeof import.meta !== 'undefined' ? import.meta.url : undefined;
 const isMainModule =
   Boolean(process.argv[1]) &&
-  path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
+  Boolean(currentFileUrl) &&
+  path.resolve(process.argv[1]) ===
+    (currentFileUrl ? path.resolve(fileURLToPath(currentFileUrl)) : '');
 
 if (!IS_SERVERLESS && isMainModule) {
   startServer().catch((err) => {

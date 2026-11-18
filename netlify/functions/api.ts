@@ -35,11 +35,22 @@ export async function handler(
   event: Record<string, unknown>,
   context: Record<string, unknown>
 ) {
-  const rawPath = typeof event.path === 'string' ? event.path : '/';
-  const normalizedEvent = {
-    ...event,
-    path: normalizeNetlifyPath(rawPath),
-  };
-  const fn = await getHandler();
-  return fn(normalizedEvent, context);
+  try {
+    const rawPath = typeof event.path === 'string' ? event.path : '/';
+    const normalizedEvent = {
+      ...event,
+      path: normalizeNetlifyPath(rawPath),
+    };
+    const fn = await getHandler();
+    return await fn(normalizedEvent, context);
+  } catch (err) {
+    console.error('Netlify API function error:', err);
+    return {
+      statusCode: 500,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        error: err instanceof Error ? err.message : 'Internal server error',
+      }),
+    };
+  }
 }
