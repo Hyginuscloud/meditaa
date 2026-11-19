@@ -11,7 +11,31 @@ import type { SiteConfig } from './src/data/siteConfig.ts';
 
 dotenv.config();
 
-const PORT = Number(process.env.PORT) || 3000;
+function readCliArg(flag: string): string | undefined {
+  const args = process.argv.slice(2);
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg === flag && args[i + 1] && !args[i + 1].startsWith('--')) {
+      return args[i + 1];
+    }
+    if (arg.startsWith(`${flag}=`)) {
+      return arg.slice(flag.length + 1);
+    }
+  }
+  return undefined;
+}
+
+const CLI_PORT = Number(readCliArg('--port'));
+const ENV_PORT = Number(process.env.PORT);
+const PORT =
+  Number.isFinite(CLI_PORT) && CLI_PORT > 0
+    ? CLI_PORT
+    : process.env.NODE_ENV !== 'production' && ENV_PORT === 8080
+    ? 3000
+    : Number.isFinite(ENV_PORT) && ENV_PORT > 0
+    ? ENV_PORT
+    : 3000;
+const HOST = readCliArg('--host') || '0.0.0.0';
 const IS_SERVERLESS = Boolean(
   process.env.VERCEL ||
     process.env.AWS_LAMBDA_FUNCTION_NAME ||
@@ -679,7 +703,8 @@ export async function createApp(options?: { serverless?: boolean }): Promise<exp
   const app = express();
   const store = loadStore();
   const supabaseEnv = getSupabaseEnv();
-  if (supabaseEnv) {
+  const syncInitialFromSupabase = async (): Promise<void> => {
+    if (!supabaseEnv) return;
     const [remoteConfig] = await Promise.all([
       loadSiteConfigFromSupabase(supabaseEnv),
       loadAuthFromSupabase(supabaseEnv, store.auth),
@@ -687,6 +712,13 @@ export async function createApp(options?: { serverless?: boolean }): Promise<exp
     if (remoteConfig) {
       store.siteConfig = remoteConfig;
       saveStore(store);
+    }
+  };
+  let initialSyncPromise: Promise<void> = Promise.resolve();
+  if (supabaseEnv) {
+    initialSyncPromise = syncInitialFromSupabase();
+    if (isServerless) {
+      await initialSyncPromise;
     }
   }
 
@@ -819,6 +851,7 @@ export async function createApp(options?: { serverless?: boolean }): Promise<exp
 
   // Login (supports Admin or Manager password)
   app.post('/api/auth/login', async (req: Request, res: Response) => {
+    await initialSyncPromise;
     if (isServerless && supabaseEnv) {
       await loadAuthFromSupabase(supabaseEnv, store.auth);
     }
@@ -1061,8 +1094,8 @@ async function startServer(): Promise<void> {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`MediTrust server listening on http://0.0.0.0:${PORT}`);
+  app.listen(PORT, HOST, () => {
+    console.log(`MediTrust server listening on http://${HOST}:${PORT}`);
   });
 }
 
