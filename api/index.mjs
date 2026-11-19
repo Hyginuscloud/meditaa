@@ -1,6 +1,4 @@
-import type { IncomingMessage, ServerResponse } from 'node:http';
-import type express from 'express';
-import { createApp } from '../server.ts';
+import { createApp } from './_server.mjs';
 
 export const config = {
   api: {
@@ -8,9 +6,9 @@ export const config = {
   },
 };
 
-let cachedAppPromise: Promise<express.Express> | null = null;
+let cachedAppPromise = null;
 
-function getApp(): Promise<express.Express> {
+function getApp() {
   if (!cachedAppPromise) {
     cachedAppPromise = createApp({ serverless: true }).catch((err) => {
       cachedAppPromise = null;
@@ -20,10 +18,10 @@ function getApp(): Promise<express.Express> {
   return cachedAppPromise;
 }
 
-export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
+export default async function handler(req, res) {
   try {
     const app = await getApp();
-    await new Promise<void>((resolve, reject) => {
+    await new Promise((resolve, reject) => {
       const cleanup = () => {
         res.off('finish', onDone);
         res.off('close', onDone);
@@ -33,14 +31,14 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         cleanup();
         resolve();
       };
-      const onError = (err: Error) => {
+      const onError = (err) => {
         cleanup();
         reject(err);
       };
       res.once('finish', onDone);
       res.once('close', onDone);
       res.once('error', onError);
-      app(req as Parameters<typeof app>[0], res as Parameters<typeof app>[1]);
+      app(req, res);
     });
   } catch (err) {
     console.error('Vercel API handler error:', err);
